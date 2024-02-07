@@ -1,0 +1,11 @@
+Nomenclature,Variable,units
+DOY,day of the year,
+T,Temperature,[deg C]
+Tmax,Hourly maximum temperature ,[deg C]
+Tmin,Hourly minimum temperature,[deg C]
+RH,Relative humidity ,[-]
+VPD,Vapour pressure deficit, [kPa]
+R,Radiation,[W m-2]
+WS,Maximum wind speed  ,[m s-1]
+P,Precipitation ,[L m-2] or [mm]
+SD,Standard deviation,variable units
