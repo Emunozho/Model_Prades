@@ -71,7 +71,7 @@ set.seed(123); gppRyu=rnorm(n,mean=6.2711587, sd=sqrt(1.6605167))
 set.seed(456); gppJung=rnorm(n, mean=6.687468, sd=sqrt(0.28476033))
 gpp=((gppRyu+gppJung)/2)*365/100
 
-pdf("../Figures/GPPhist.pdf")
+pdf("Figures/GPPhist.pdf")
 hist(gpp)
 dev.off()
 
@@ -140,9 +140,7 @@ randomFit=function(GPP){
   return(cp)
 }
 
-
-
-meanSATTs=function(u, B){
+meanSATTs=function(u,B){
   x=-1*solve(B)%*%u
   SA=sum(-1*solve(B)%*%x)/(sum(x))
   TT=sum(x)/sum(u)
@@ -160,8 +158,8 @@ allObjects=ls()
 clusterExport(cl, varlist=c(allObjects, "modFit", "ode","modCost","Model", "getC"))
 
 # modpars=parSapply(cl,gpp,FUN=randomFit)
-# modpars=t(modpars)
-# save(modpars, file="modpars.RData")
+modpars=t(modpars)
+save(modpars, file="modpars.RData")
 load("modpars.RData")
 
 porceSATT=NULL
@@ -188,7 +186,7 @@ mTT=transitTime(A=meanB, u=meanU, a=tau)
 Mt=t(sapply(tau,FUN=M, B=meanB, u=meanU))
 Resp=t(sapply(tau, FUN=Rt, B=meanB, u=meanU))
 
-pdf("../Figures/Fate.pdf")
+pdf("Figures/Fate.pdf")
 par(mfrow=c(2,1),mar=c(4,4.5,0.1,0.1))
 matplot(tau, Mt[,1:3], col=pal, lty=c(1,2,2), lwd=c(1,1,2), type="l", xlim=c(0,100),cex.lab=1.1,  xlab="", ylab=expression(paste("Carbon remaining (Mg C h",a^-1,")")), bty="n")
 lines(tau, rowSums(Mt),lwd=2)
@@ -198,7 +196,7 @@ legend("topright", poolnames[4:7], col=pal[4:7], lty=c(1,2,1,2),lwd=c(1,2,2,1), 
 par(mfrow=c(1,1))
 dev.off()
 
-pdf("../Figures/TransitTime.pdf")
+pdf("Figures/TransitTime.pdf")
 par(mfrow=c(2,1), mar=c(4,4.5,1,1))
 plot(tau,meanGPP*mTT$transitTimeDensity, xlim=c(0,10),type="l",lwd=2,cex.lab=1.1,xlab="", ylab=expression(paste("Carbon respired (Mg C h",a^-1, " y", r^-1, ")")),bty="n")
 matlines(tau,Resp[,c(1,5)],lty=c(1,2),col=pal[c(1,5)])
@@ -217,7 +215,7 @@ ind50=which(tau <= mTT$quantiles[2])
 ind95=which(tau <= mTT$quantiles[3])
 bluepal=brewer.pal(3,"Blues")
 
-pdf("../Figures/areaTTdistribution.pdf")
+pdf("Figures/areaTTdistribution.pdf")
 par(mar=c(4,5,1,1))
 plot(tau,meanGPP*mTT$transitTimeDensity, xlim=c(0,5),type="l",lwd=2,cex.lab=1.1,
      ylab=expression(paste("Carbon respired (Mg C h",a^-1, " y", r^-1, ")")),
@@ -307,7 +305,7 @@ round(mean(q5TT),2); round(sd(q5TT),2)
 round(mean(q95TT),2); round(sd(q95TT),2)
 
 
-pdf("../Figures/avgModel.pdf")
+pdf("Figures/avgModel.pdf")
 matplot(avgModel[,1], avgModel[,-1], type="l",lty=1, col=pal, xlab="Time since recovery (years)", ylab="Carbon stocks (Mg C ha-1)", bty="n")
 points(obsFol,col=pal[1], pch=19, cex=0.5)
 points(obsWood, col=pal[2], pch=19, cex=0.5)
@@ -319,7 +317,7 @@ points(obsSC, col=pal[7], pch=19, cex=0.5)
 legend("topleft", legend=poolnames, lty=1, col=pal, bty="n")
 dev.off()
 
-pdf("../Figures/dataModelFit.pdf")
+pdf("Figures/dataModelFit.pdf")
 par(mfrow=c(2,2), mar=c(4,4.5,0.1,0.1))
 plot(meanpred[,1], meanpred[,2], type="l", col=pal[1], bty="n", ylim=c(0,15),cex.lab=1.1, ylab=expression(paste("Carbon stock (Mg C h",a^-1,")")), xlab="")
 polygon(x=c(maxpred[,1],rev(minpred[,1])), y=c(maxpred[,2], rev(minpred[,2])), col="gray", border = pal[1])
@@ -350,7 +348,7 @@ legend("topleft", "d", bty="n")
 par(mfrow=c(1,1))
 dev.off()
 
-pdf("../Figures/modelDataFitboxplot.pdf")
+pdf("Figures/modelDataFitboxplot.pdf")
 par(mfrow=c(2,2), mar=c(4,4.5,0.1,0.1))
 plot(meanpred[,1], meanpred[,2], type="l", col=pal[1], bty="n", ylim=c(0,15),xlim=c(0,100), ylab=expression(paste("Carbon stock (Mg C h",a^-1,")")), xlab="")
 polygon(x=c(maxpred[,1],rev(minpred[,1])), y=c(maxpred[,2], rev(minpred[,2])), col="gray", border = pal[1])
@@ -389,7 +387,7 @@ par(mfrow=c(1,1))
 dev.off()
 
 upxlim=c(10,100,100,100,10,100,200,200); agelab=c(rep(" ",6), "Age (yr)")
-pdf("../Figures/poolAges.pdf")
+pdf("Figures/poolAges.pdf")
 par(mfrow=c(4,2),mar=c(4,4,1,1))
 for(i in 1:length(poolnames)){
   plot(tau,mSA$poolAgeDensity[,i],type="l",col=pal[i], xlim=c(0,upxlim[i]),cex.lab=1.1, ylab="Density", xlab=agelab[i], bty="n")
