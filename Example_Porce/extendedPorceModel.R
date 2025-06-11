@@ -9,7 +9,7 @@ no_cores <- detectCores() #- 10
 
 # Initiate cluster
 cl <- makeCluster(no_cores)
-
+setwd("~/Documents/MSCA/DISEQ/Prades_model/Example_Porce") # set path.
 
 Cdata<-read.csv("PorcedB2012.csv")
 poolnames=c("Foliage", "Wood", "Fine roots", "Coarse roots", "Fine litter", "Coarse woody debris", "Soil carbon")

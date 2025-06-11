@@ -4,16 +4,13 @@
 # - Probar valores iniciales diferentes.
 # - Verificar que cada distribucion corresponda a los puntos observados.
 
-
 library(SoilR)
 library(FME)
 library(RColorBrewer)
 library(expm)
 library(parallel)
 
-
-setwd("~/Documents/MSCA/DISEQ/Prades model") # set path.
-
+setwd("~/Documents/MSCA/DISEQ/Prades_model") # set path.
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------
 # Cores
@@ -22,13 +19,14 @@ setwd("~/Documents/MSCA/DISEQ/Prades model") # set path.
 no_cores=detectCores() #- 10
 
 # Initiate cluster
-cl <- makeCluster(no_cores)
+#cl <- makeCluster(no_cores)
+cl <- makeCluster(6)
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------
 # Functions
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------
 M=function(t,B,u){expm(t*B)%*%u} # Mass carbon.
-Rt=function(t, B, u){diag(colSums(-B))%*%expm(t*B)%*%u} # Respiratory losses.
+Rt=function(t,B,u){diag(colSums(-B))%*%expm(t*B)%*%u} # Respiratory losses.
 
 # create natrix B,
 makeB=function(pars){
@@ -38,6 +36,7 @@ makeB=function(pars){
   B[4,1]=pars["alpha41"]*pars["k1"]
   B[5,2]=pars["alpha52"]*pars["k2"]
   B[4,3]=pars["alpha43"]*pars["k3"]
+  B[5,3]=pars["alpha53"]*pars["k3"]
   B[6,3]=pars["alpha63"]*pars["k3"]
   B[7,3]=pars["alpha73"]*pars["k3"]
   B[6,4]=pars["alpha64"]*pars["k4"]
@@ -47,7 +46,7 @@ makeB=function(pars){
 }
 
 ecoModel=function(pars,GPP){
-  mod=Model(t=yr,A=makeB(pars),ivList=P0,inputFluxes=c(GPP,rep(0,6)),pass=TRUE)
+  mod=Model(t=yr,A=makeB(pars),ivList=P0,inputFluxes=c(GPP,rep(0,6)),pass=TRUE) # 0 to 6 because there are 7 pools.
   Ct=getC(mod)
   colnames(Ct)<-c("Fol","Wood","Root","FL","CL","SHA","SHB")
   return(data.frame(time=yr,Ct))
@@ -63,21 +62,46 @@ ecoModel=function(pars,GPP){
 #   return(cost5)
 # }
 
-ecoCost=function(pars, GPP){
-  out=ecoModel(pars, GPP)
-  cost1=modCost(model=out,obs=obsFol, weight="none")
+# ecoCost=function(pars,GPP){
+#   out=ecoModel(pars,GPP)
+#   cost1=modCost(model=out,obs=obsFol, weight="none")
+#   cost2=modCost(model=out,obs=obsWood,cost=cost1, weight="none")
+#   #cost3=modCost(model=out,obs=obsFR,cost=cost2, weight="none")
+#   #cost3=modCost(model=out,obs=obsRoot,cost=cost2, weight="none")
+#   cost3=modCost(model=out,obs=obsFL,cost=cost2, weight="mean")
+#   cost4=modCost(model=out,obs=obsCL,cost=cost3, weight="mean")
+#   cost5=modCost(model=out,obs=obsSHA,cost=cost4, weight="mean")
+#   cost6=modCost(model=out,obs=obsSHB,cost=cost5, weight="std")
+#   return(cost6)
+# }
+
+ecoCost=function(pars,GPP){
+  out=ecoModel(pars,GPP)
+  cost1=modCost(model=out,obs=obsFol, weight="mean")
   cost2=modCost(model=out,obs=obsWood,cost=cost1, weight="none")
-  #cost3=modCost(model=out,obs=obsFR,cost=cost2, weight="none")
-  #cost3=modCost(model=out,obs=obsRoot,cost=cost2, weight="none")
-  cost3=modCost(model=out,obs=obsFL,cost=cost2, weight="std")
-  cost4=modCost(model=out,obs=obsCL,cost=cost3, weight="mean")
-  cost5=modCost(model=out,obs=obsSHA,cost=cost4, weight="none")
-  cost6=modCost(model=out,obs=obsSHB,cost=cost5, weight="none")
-  return(cost6)
+  cost3=modCost(model=out,obs=obsRoot,cost=cost2, weight="std")
+  cost4=modCost(model=out,obs=obsFL,cost=cost3, weight="std")
+  cost5=modCost(model=out,obs=obsCL,cost=cost4, weight="std")
+  cost6=modCost(model=out,obs=obsSHA,cost=cost5, weight="std")
+  cost7=modCost(model=out,obs=obsSHB,cost=cost6, weight="std")
+  return(cost7)
 }
 
+# ecoCost=function(pars,GPP){
+#   out=ecoModel(pars,GPP)
+#   cost1=modCost(model=out,obs=obsRoot, weight="std")
+#   cost2=modCost(model=out,obs=obsWood,cost=cost1, weight="std")
+#   #cost3=modCost(model=out,obs=obsFR,cost=cost2, weight="none")
+#   cost3=modCost(model=out,obs=obsFL,cost=cost2, weight="std")
+#   cost4=modCost(model=out,obs=obsCL,cost=cost3, weight="std")
+#   cost5=modCost(model=out,obs=obsSHA,cost=cost4, weight="std")
+#   cost6=modCost(model=out,obs=obsSHB,cost=cost5, weight="std")
+#   cost7=modCost(model=out,obs=obsFol,cost=cost6, weight="std")
+#   return(cost7)
+# }
+
 randomFit=function(GPP){
-  ecoFit=modFit(f=ecoCost,p=inipars,GPP=GPP,lower=0,upper=c(rep(3,7),rep(1,10)), method="Marq")
+  ecoFit=modFit(f=ecoCost,p=inipars,GPP=GPP,lower=0,upper=c(rep(3,7),rep(1,11)), method="Marq") # 7 because there are 7 pools, and 11 because there are 11 alphas (matrix B).
   cp=coef(ecoFit)
   return(cp)
 }
@@ -91,30 +115,42 @@ meanSATTs=function(u, B){
 
 makeMod=function(pars,GPP){
   B=makeB(pars)
-  u=matrix(c(GPP,rep(0,6)),7,1)
+  u=matrix(c(GPP,rep(0,6)),7,1) # 7 pools
   SATT=meanSATTs(u,B)
   return(SATT)
 }
-
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------
 # Read and prepare data
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------
 treat='Control' # Treatment: select 'Control' or 'Drought'
+
+
+# 
+# if (treat=='Control'){
+#   Cdata<-read.csv("Data/Prades_data_control.csv") 
+# } else if (treat=='Drought'){
+#   Cdata<-read.csv("Data/Prades_data_drought.csv")
+# } else {
+#   print("Select a treatment")
+# }
+
+# with stocks at 1953 equal to zero (except for soil that is the min) and data taken in the field trip. 
 if (treat=='Control'){
-  Cdata<-read.csv("Data/Prades_data_control.csv") 
+  Cdata<-read.csv("Data/Prades_data_control_plusfieldwork2.csv") 
 } else if (treat=='Drought'){
-  Cdata<-read.csv("Data/Prades_data_drought.csv")
+  Cdata<-read.csv("Data/Prades_data_drought_plusfieldwork.csv")
 } else {
   print("Select a treatment")
 }
 
-poolnames=c("Foliage", "Wood", "Roots", "Thin litter", "Thick litter", "Soil carbon A", "Soil carbon B")
-poolnamesd=c("Foliage", "Wood", "Thin litter", "Thick litter", "Soil carbon A", "Soil carbon B")
+poolnames=c("Foliage", "Wood", "Roots", "Fine litter", "Coarse litter", "Soil carbon A", "Soil carbon B")
+#poolnamesd=c("Foliage", "Wood", "Fine litter", "Coarse litter", "Soil carbon A", "Soil carbon B")
+poolnamesd=poolnames
 
-pdf("Figures/Stocks.pdf",5,8)
-par(mfrow=c(3,2))
-for (i in 3:8){
+pdf("Figures/Model/Stocks.pdf",5,8)
+par(mfrow=c(4,2))
+for (i in 3:9){
   plot(x=Cdata[,1],y=Cdata[,i],
      col="#69b3a2",
      pch=20,
@@ -129,7 +165,7 @@ dev.off()
 GPP=47.63 # [Mg ha-1] Interpolation for 2024 from data reported in Table 5 by Sabaté (2002).
 GPP_sd=6.91 # [Mg ha-1] Interpolation for 2024 from data reported in Table 5 by Sabaté (2002).
 
-# Random variates for primary forests. Mean and sd values from data provided by Romà Ogaya.
+# # Random variates for primary forests. Mean and sd values from data provided by Romà Ogaya.
 # nplots=4
 # set.seed(11); primaryplotAges=sample(45:80,nplots,replace=TRUE)
 # set.seed(22); folp=rnorm(nplots,mean=mean(Cdata$Leaves),sd=sd(Cdata$Leaves))
@@ -142,7 +178,7 @@ GPP_sd=6.91 # [Mg ha-1] Interpolation for 2024 from data reported in Table 5 by 
 # set.seed(99); soilcBp=rnorm(nplots,mean=mean(Cdata$Soil.Hz.B,na.rm=TRUE),sd=sd(Cdata$Soil.Hz.B,na.rm=TRUE))
 
 # Mean and sd values from data provided by Romà Ogaya.
-y0=1953 # year since the forest is not disturbed. According to Ogaya et al, (2020). Other sources say the forest is undisturbed from 45 to 80 years ago. 
+y0=1950 # year since the forest is not disturbed. According to Ogaya et al, (2020). Other sources say the forest is undisturbed from 45 to 80 years ago. 
 # Observations from forest 
 obsFol=data.frame(time=Cdata$Year-y0,Fol=Cdata$Leaves)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
 obsWood=data.frame(time=Cdata$Year-y0,Wood=Cdata$Wood)
@@ -150,53 +186,55 @@ obsFL=data.frame(time=Cdata$Year-y0,FL=Cdata$Thin.litter)
 obsCL=data.frame(time=Cdata$Year-y0,CL=Cdata$Thick.litter)
 obsSHA=data.frame(time=Cdata$Year-y0,SHA=Cdata$Soil.Hz.A)
 obsSHB=data.frame(time=Cdata$Year-y0,SHB=Cdata$Soil.Hz.B)
-obsST=data.frame(time=Cdata$Year-y0,ST=Cdata$Soil.Hz.A+Cdata$Soil.Hz.B)
+#obsST=data.frame(time=Cdata$Year-y0,ST=Cdata$Soil.Hz.A+Cdata$Soil.Hz.B)
 
-# plot(x=obsFol[,1],y=obsFol[,2])
+obsRoot=data.frame(time=Cdata$Year-y0,Root=Cdata$Roots)    
+
+plot(x=obsSHA[,1],y=obsSHA[,2])
 # # Merged observations
 # obsFol=rbind(obsFols,data.frame(time=primaryplotAges,Fol=folp))
 # obsWood=rbind(obsWoods,data.frame(time=primaryplotAges,Wood=woodp))
 # #obsFR=rbind(obsFRs,data.frame(time=primaryplotAges,FR=finerootp))
 # #obsCR=rbind(obsCRs,data.frame(time=primaryplotAges,CR=coarserootp))
-# obsFL=rbind(obsFLs,data.frame(time=primaryplotAges,FL=finelitterp))
-# obsCWD=rbind(obsCWDs,data.frame(time=primaryplotAges,CWD=cwdp))
-# obsSA=rbind(obsSAs,data.frame(time=primaryplotAges,SA=soilcAp))
-# obsSB=rbind(obsSBs,data.frame(time=primaryplotAges,SB=soilcBp))
+# obsFL=rbind(obsFL,data.frame(time=primaryplotAges,FL=finelitterp))
+# obsCWD=rbind(obsCWD,data.frame(time=primaryplotAges,CWD=cwdp))
+# obsSA=rbind(obsSA,data.frame(time=primaryplotAges,SA=soilcAp))
+# obsSB=rbind(obsSB,data.frame(time=primaryplotAges,SB=soilcBp))
 
-yr=seq(0,150,0.5)
+yr=seq(0,80,0.5)
 
 # Initial values
-P0=c(Fol=0,Wood=0,Root=0,FL=0,CL=0,SHA=mean(obsSHA[,2],na.rm=TRUE),SHB=mean(obsSHB[,2],na.rm=TRUE))
-
+#P0=c(Fol=0.1,Wood=0.1,Root=0.1,FL=0.1,CL=0.1,SHA=min(obsSHA[,2],na.rm=TRUE),SHB=min(obsSHB[,2],na.rm=TRUE))
+P0=c(Fol=min(obsFol[,2],na.rm=TRUE)/2,Wood=min(obsWood[,2],na.rm=TRUE)/2,Root=min(obsRoot[,2],na.rm=TRUE)/2,FL=min(obsFL[,2],na.rm=TRUE)/2,CL=min(obsCL[,2],na.rm=TRUE)/2,SHA=min(obsSHA[,2],na.rm=TRUE)*2/3,SHB=min(obsSHB[,2],na.rm=TRUE)*2/3)
 # inipars=c(k1=0.5,k2=0.3,k3=0.1,k4=0.1,k5=0.1,k6=0.1,k7=0.1,
 #           alpha21=0.1,alpha31=0.1,alpha41=0.1,alpha51=0.1,alpha53=0.1,alpha62=0.1,alpha64=0.1,alpha75=0.1,alpha76=0.1)
 
-inipars=c(k1=0.5,k2=0.3,k3=0.1,k4=0.1,k5=0.1,k6=0.1,k7=0.1,
-          alpha21=0.1,alpha31=0.1,alpha41=0.1,alpha52=0.1,alpha43=0.1,alpha63=0.1,alpha73=0.1,alpha64=0.1,alpha65=0.1,alpha76=0.1)
+inipars=c(k1=0.01,k2=0.1,k3=0.1,k4=0.1,k5=0.1,k6=0.5,k7=0.1,
+          alpha21=0.2,alpha31=0.2,alpha41=0.2,alpha52=0.1,alpha43=0.1,alpha53=0.1,alpha63=0.1,alpha73=0.1,alpha64=0.1,alpha65=0.1,alpha76=0.1)
 
-tau=seq(0,400,by=0.05)
+tau=seq(0,400,by=0.5)
 pal=brewer.pal(7,"Dark2")
 
 
 # Random variation of gpp.
-n=1000
+n=50
 set.seed(123); gpp=rnorm(n,mean=GPP,sd=GPP_sd)
-
-pdf("Figures/GPPhist.pdf")
+pdf("Figures/Model/GPPhist.pdf")
 hist(gpp)
 dev.off()
-
 
 allObjects=ls()
 clusterExport(cl, varlist=c(allObjects, "modFit", "ode","modCost","Model", "getC"))
 
 # ------------------------ Save data modelled
-# modpars=parSapply(cl,gpp,FUN=randomFit)
-# modpars=t(modpars)
-# save(modpars, file="modpars.RData")
+modpars=parSapply(cl,gpp,FUN=randomFit) # This line runs the functions (it takes longer).
+modpars=t(modpars)
+file_name <- paste(treat,"_modpars2.RData", col="", sep="")
+
+save(modpars, file=file_name)
 
 # ------------------------ Open data saved
-load("modpars.RData")
+load(file_name)
 
 porceSATT=NULL
 for(i in 1:length(gpp)){
@@ -222,7 +260,7 @@ mTT=transitTime(A=meanB, u=meanU, a=tau)
 Mt=t(sapply(tau,FUN=M, B=meanB, u=meanU))
 Resp=t(sapply(tau, FUN=Rt, B=meanB, u=meanU))
 
-pdf("Figures/Fate.pdf")
+pdf("Figures/Model/Fate.pdf")
 par(mfrow=c(2,1),mar=c(4,4.5,0.1,0.1))
 matplot(tau, Mt[,1:3], col=pal, lty=c(1,2,2), lwd=c(1,1,2), type="l", xlim=c(0,100),cex.lab=1.1,  xlab="", ylab=expression(paste("Carbon remaining (Mg C h",a^-1,")")), bty="n")
 lines(tau, rowSums(Mt),lwd=2)
@@ -232,7 +270,7 @@ legend("topright", poolnames[4:7], col=pal[4:7], lty=c(1,2,1,2),lwd=c(1,2,2,1), 
 par(mfrow=c(1,1))
 dev.off()
 
-pdf("Figures/TransitTime.pdf")
+pdf("Figures/Model/TransitTime.pdf")
 par(mfrow=c(2,1), mar=c(4,4.5,1,1))
 plot(tau,meanGPP*mTT$transitTimeDensity, xlim=c(0,10),type="l",lwd=2,cex.lab=1.1,xlab="", ylab=expression(paste("Carbon respired (Mg C h",a^-1, " y", r^-1, ")")),bty="n")
 matlines(tau,Resp[,c(1,5)],lty=c(1,2),col=pal[c(1,5)])
@@ -251,7 +289,7 @@ ind50=which(tau <= mTT$quantiles[2])
 ind95=which(tau <= mTT$quantiles[3])
 bluepal=brewer.pal(3,"Blues")
 
-pdf("Figures/areaTTdistribution.pdf")
+pdf("Figures/Model/areaTTdistribution.pdf")
 par(mar=c(4,5,1,1))
 plot(tau,meanGPP*mTT$transitTimeDensity, xlim=c(0,5),type="l",lwd=2,cex.lab=1.1,
      ylab=expression(paste("Carbon respired (Mg C h",a^-1, " y", r^-1, ")")),
@@ -340,10 +378,11 @@ for(i in 1:n){
 round(mean(q5TT),2); round(sd(q5TT),2)
 round(mean(q95TT),2); round(sd(q95TT),2)
 
-pdf("Figures/avgModel.pdf")
+pdf("Figures/Model/avgModel.pdf")
 matplot(avgModel[,1], avgModel[,-1], type="l",lty=1, col=pal, xlab="Time since recovery (years)", ylab="Carbon stocks (Mg C ha-1)", bty="n")
 points(obsFol,col=pal[1], pch=19, cex=0.5)
 points(obsWood, col=pal[2], pch=19, cex=0.5)
+points(obsRoot, col=pal[3], pch=19, cex=0.5)
 points(obsFL, col=pal[4], pch=19, cex=0.5)
 points(obsCL, col=pal[5], pch=19, cex=0.5)
 points(obsSHA, col=pal[6], pch=19, cex=0.5)
@@ -351,7 +390,7 @@ points(obsSHB, col=pal[7], pch=19, cex=0.5)
 legend("topleft", legend=poolnames, lty=1, col=pal, bty="n")
 dev.off()
 
-pdf("Figures/dataModelFit.pdf")
+pdf("Figures/Model/dataModelFit.pdf")
 par(mfrow=c(2,2), mar=c(4,4.5,0.1,0.1))
 plot(meanpred[,1], meanpred[,2], type="l", col=pal[1], bty="n", ylim=c(0,15),cex.lab=1.1, ylab=expression(paste("Carbon stock (Mg C h",a^-1,")")), xlab="")
 polygon(x=c(maxpred[,1],rev(minpred[,1])), y=c(maxpred[,2], rev(minpred[,2])), col="gray", border = pal[1])
@@ -371,7 +410,7 @@ plot(meanpred[,1], meanpred[,7], col=pal[6], type="l", ylim=c(0,10),cex.lab=1.1,
 polygon(x=c(maxpred[,1],rev(minpred[,1])), y=c(maxpred[,7], rev(minpred[,7])), col="gray", border = pal[6])
 points(obsCL, col=pal[6], pch=19, cex=0.5)
 polygon(x=c(maxpred[,1],rev(minpred[,1])), y=c(maxpred[,4], rev(minpred[,4])), col="gray", border = pal[3])
-# points(obsRoot, col=pal[3], pch=19, cex=0.5)
+points(obsRoot, col=pal[3], pch=19, cex=0.5)
 legend("topleft", "c", bty="n")
 
 plot(meanpred[,1], meanpred[,8], type="l", col=pal[7], bty="n", ylim=c(0,200),cex.lab=1.1, ylab=expression(paste("Carbon stock (Mg C h",a^-1,")")), xlab="Time (yr)")
@@ -382,7 +421,7 @@ legend("topleft", "d", bty="n")
 par(mfrow=c(1,1))
 dev.off()
 
-pdf("Figures/modelDataFitboxplot.pdf")
+pdf("Figures/Model/modelDataFitboxplot.pdf")
 par(mfrow=c(2,2), mar=c(4,4.5,0.1,0.1))
 plot(meanpred[,1], meanpred[,2], type="l", col=pal[1], bty="n", ylim=c(0,15),xlim=c(0,100), ylab=expression(paste("Carbon stock (Mg C h",a^-1,")")), xlab="")
 polygon(x=c(maxpred[,1],rev(minpred[,1])), y=c(maxpred[,2], rev(minpred[,2])), col="gray", border = pal[1])
